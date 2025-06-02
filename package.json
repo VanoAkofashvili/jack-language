@@ -1,0 +1,14 @@
+{
+  "name": "Jack",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github-personal:VanoAkofashvili/jack-language.git",
+  "author": "Vaniko Akopashvili <vaniko.akopashvili@makingscience.com>",
+  "license": "MIT",
+  "scripts": {
+    "sa": "tsx ./syntax-analyzer/main.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.4"
+  }
+}
