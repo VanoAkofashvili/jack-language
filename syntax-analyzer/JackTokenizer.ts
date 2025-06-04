@@ -20,11 +20,15 @@ export class JackTokenizer {
     this.scanTokens();
   }
 
+  // TODO
+  public getTokens() {
+    return this.tokens;
+  }
+
   scanTokens() {
     while (!this.isAtEnd()) {
       this.scanSingleToken();
     }
-    console.log(this.tokens);
   }
 
   scanSingleToken() {

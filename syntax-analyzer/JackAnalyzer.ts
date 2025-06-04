@@ -1,8 +1,8 @@
 import { isDirectory, getFiles, getOutputPath } from "./utils";
 // input - fileName.jack or directory
 
-import { CompilationEngine } from "./CompilationEngine";
 import { JackTokenizer } from "./JackTokenizer";
+import { XMLEngine } from "./XMLEngine";
 
 // output - fileName.xml or one xml for every jack
 export class JackAnalyzer {
@@ -16,9 +16,12 @@ export class JackAnalyzer {
 
   processFile(filename: string) {
     const tokenizer = new JackTokenizer(filename);
-    const compilationEngine = new CompilationEngine();
-    const output = getOutputPath(filename);
-    console.log(tokenizer.advance());
-    console.log(output, "output");
+    const xmlEngine = new XMLEngine(getOutputPath(filename));
+
+    tokenizer.getTokens().forEach((token) => {
+      xmlEngine.writeToken(token);
+    });
+
+    xmlEngine.end();
   }
 }
