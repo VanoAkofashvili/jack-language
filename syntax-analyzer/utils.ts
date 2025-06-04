@@ -15,7 +15,7 @@ const getFiles = (dirPath: string, ext: string) => {
 const getOutputPath = (inputJack: string) => {
   return path.format({
     ext: ".xml",
-    name: path.basename(inputJack, ".jack"),
+    name: path.basename(inputJack + "MineT", ".jack"),
     dir: path.dirname(inputJack),
   });
 };

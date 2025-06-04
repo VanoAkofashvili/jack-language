@@ -8,7 +8,8 @@ import { XMLEngine } from "./XMLEngine";
 export class JackAnalyzer {
   constructor(src: string) {
     if (isDirectory(src)) {
-      // TODO
+      const files = getFiles(src, ".jack");
+      files.forEach((src) => this.processFile(src));
     } else {
       this.processFile(src);
     }
