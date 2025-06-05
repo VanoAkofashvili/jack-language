@@ -34,6 +34,10 @@ export class JackTokenizer {
   scanSingleToken() {
     const c = this.advance();
 
+    // Comments
+    if (c === "/" && ["/", "*"].some(this.match.bind(this))) {
+      return this.consumeComment();
+    }
     if (SYMBOLS.includes(c)) {
       this.addToken(TokenType.SYMBOL, c);
     } else if (c === STRING_MATCHER) {
@@ -45,6 +49,34 @@ export class JackTokenizer {
         this.getIdentifierAndKeywords(c);
       }
     }
+  }
+
+  private consumeComment() {
+    let c = this.advance();
+
+    switch (c) {
+      case "/":
+        return this.consumeLineComment();
+      case "*":
+        return this.consumeBlockComment();
+      default:
+        throw new Error("Maybe syntax error?");
+    }
+  }
+  private consumeLineComment() {
+    let c = this.advance();
+    while (c !== "\n") {
+      c = this.advance();
+    }
+  }
+  private consumeBlockComment() {
+    let c = this.advance();
+    console.log("block: ", c);
+
+    while (c !== "*" && !this.match("/")) {
+      c = this.advance();
+    }
+    return this.advance();
   }
 
   private getIdentifierAndKeywords(starting: string) {
@@ -86,6 +118,10 @@ export class JackTokenizer {
 
   private peek() {
     return this.content.charAt(this.cursor);
+  }
+
+  private match(expect: string) {
+    return this.content.charAt(this.cursor) === expect;
   }
 
   private isAtEnd() {
