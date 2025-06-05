@@ -8,47 +8,49 @@ import {
   TokenType,
 } from "./constants";
 
-// incapsulate the src
 export class JackTokenizer {
   private content: string;
   private tokens: Token[] = [];
 
   private cursor: number = 0;
+  private start: number = 0
 
   constructor(src: string) {
     this.content = fs.readFileSync(src).toString("utf-8");
     this.scanTokens();
   }
 
-  // TODO
   public getTokens() {
     return this.tokens;
   }
 
   scanTokens() {
     while (!this.isAtEnd()) {
+      // start parsing the next token
+      this.start = this.cursor
       this.scanSingleToken();
     }
   }
 
   scanSingleToken() {
-    const c = this.advance();
+    // current char
+    const c = this.advance()
 
-    // Comments
-    if (c === "/" && ["/", "*"].some(this.match.bind(this))) {
+    if (c === "/" && ["/", "*"].some(this.match.bind(this)))
       return this.consumeComment();
-    }
+
     if (SYMBOLS.includes(c)) {
-      this.addToken(TokenType.SYMBOL, c);
-    } else if (c === STRING_MATCHER) {
-      this.addToken(TokenType.STRING_CONST, this.getString());
-    } else if (this.isDigit(c)) {
-      this.addToken(TokenType.INT_CONST, this.getDigit(c));
-    } else {
-      if (this.isAlpha(c)) {
-        this.getIdentifierAndKeywords(c);
-      }
+      return this.addToken(TokenType.SYMBOL, c)
     }
+
+    if (c === STRING_MATCHER)
+      this.addToken(TokenType.STRING_CONST, this.getString());
+
+    if (this.isDigit(c))
+      return this.addToken(TokenType.INT_CONST, this.getDigit());
+
+    if (this.isAlpha(c)) return this.getIdentifierAndKeywords();
+
   }
 
   private consumeComment() {
@@ -64,34 +66,36 @@ export class JackTokenizer {
     }
   }
   private consumeLineComment() {
-    let c = this.advance();
-    while (c !== "\n") {
-      c = this.advance();
-    }
+    while (this.peek() !== "\n" && !this.isAtEnd()) this.advance();
   }
+
   private consumeBlockComment() {
     let c = this.advance();
-    console.log("block: ", c);
 
-    while (c !== "*" && !this.match("/")) {
+    while (true) {
+      // end of block comment
+      if (c === "*" && this.match("/")) break;
       c = this.advance();
     }
-    return this.advance();
+    this.advance();
   }
 
-  private getIdentifierAndKeywords(starting: string) {
-    let identifier = starting;
+  private getIdentifierAndKeywords() {
 
-    let c = this.advance();
-    while (this.isAlphaNumeric(c)) {
-      identifier += c;
-      c = this.advance();
-    }
+    while(this.isAlphaNumeric(this.peek())) this.advance()
+
+    const identifier = this.content.substring(
+        this.start,
+        this.cursor
+    )
+
+
     if (KEYWORDS.includes(identifier)) {
       this.addToken(TokenType.KEYWORD, identifier);
-    } else {
-      this.addToken(TokenType.IDENTIFIER, identifier);
     }
+    else
+      this.addToken(TokenType.IDENTIFIER, identifier);
+
   }
 
   private getString() {
@@ -104,16 +108,14 @@ export class JackTokenizer {
     return str;
   }
 
-  private getDigit(starting: string) {
-    let digit = starting;
-
-    let c = this.advance();
-    while (this.isDigit(c)) {
-      digit += c;
-      c = this.advance();
-    }
-
-    return digit;
+  private getDigit() {
+    while (this.isDigit(this.peek())) this.advance();
+    const digit = this.content.substring(
+        this.start,
+        this.cursor
+    )
+    console.log({digit})
+    return digit
   }
 
   private peek() {

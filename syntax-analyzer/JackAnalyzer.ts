@@ -6,16 +6,18 @@ import { XMLEngine } from "./XMLEngine";
 
 // output - fileName.xml or one xml for every jack
 export class JackAnalyzer {
-  constructor(src: string) {
-    if (isDirectory(src)) {
-      const files = getFiles(src, ".jack");
+  constructor(private src: string) {}
+
+  public run() {
+    if (isDirectory(this.src)) {
+      const files = getFiles(this.src, ".jack");
       files.forEach((src) => this.processFile(src));
     } else {
-      this.processFile(src);
+      this.processFile(this.src);
     }
   }
 
-  processFile(filename: string) {
+  private processFile(filename: string) {
     const tokenizer = new JackTokenizer(filename);
     const xmlEngine = new XMLEngine(getOutputPath(filename));
 

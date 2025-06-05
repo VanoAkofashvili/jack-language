@@ -7,4 +7,4 @@ if (!src) {
   process.exit(1);
 }
 
-const jackAnalyzer = new JackAnalyzer(src);
+new JackAnalyzer(src).run();
