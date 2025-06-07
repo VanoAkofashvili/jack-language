@@ -41,14 +41,13 @@ export class CompilationEngine {
     this.eat()
   }
 
-  public eatType(expansionList?: string[], config?: { allowAnyType: boolean }) {
+  public eatType(expansionList?: string[]) {
     const token = this.currentToken()
 
-    console.log({token})
     if (token.type === 'IDENTIFIER' || token.type === 'KEYWORD') {
       const typesToCheck = CompilationEngine.Types.concat(expansionList)
 
-      if (config?.allowAnyType || typesToCheck.includes(token.value)) {
+      if (typesToCheck.includes(token.value) || token.type === 'IDENTIFIER') {
         this.tag(TokenTypeMapping[token.type], token.value)
         this.tokenizer.advance()
       } else {
@@ -58,8 +57,12 @@ export class CompilationEngine {
       throw new InvalidTokenError(token.value)
     }
 
-
   }
+
+  private match(expect: string) {
+    return this.currentToken().value === expect
+  }
+
 
   private startTag(tag: string) {
     this.write(`<${tag}>`)
@@ -109,36 +112,152 @@ export class CompilationEngine {
   }
   compileSubroutine() {
     if (!(['constructor', 'function', 'method'].includes(this.currentToken().value))) return
+    this.startTag('subroutineDec')
     this.eat() // keyword - method type
 
 
     // eat common types + void
-    this.eatType([CompilationEngine.Void], {allowAnyType: true})
+    this.eatType([CompilationEngine.Void])
     this.eatIdentifier()
     this.eat('(')
     // //TODO: handle parameter list
-    // this.compileParameterList() // zero or more
+    this.compileParameterList() // zero or more
     this.eat(')')
-    this.eat('{')
 
-    // TODO
-    // this.compileSubroutineBody()
-
-    // this.eat('}')
+    this.compileSubroutineBody()
 
 
   }
-  compileParameterList() {}
-  compileSubroutineBody() {}
-  compileVarDec() {}
-  compileStatements() {}
-  compileLet() {}
-  compileIf() {}
-  compileWhile(){}
-  compileDo() {}
-  compileReturn() {}
-  compileExpression() {}
-  compileTerm() {}
+  compileParameterList() {
+    if (!CompilationEngine.Types.includes(this.currentToken().value)) return
+    this.eatType()
+    this.eatIdentifier()
+
+
+    while(this.currentToken().value === ',') {
+      this.eat(',')
+      this.eatType()
+      this.eatIdentifier()
+    }
+  }
+  compileSubroutineBody() {
+    this.startTag('subroutineBody')
+    this.eat('{')
+
+    this.compileStatements()
+
+    // this.eat('}') // TODO
+    this.endTag('subroutineBody')
+  }
+
+  compileVarDec() {
+
+    if ((this.currentToken().value === 'var')) {
+      this.startTag('varDec')
+
+      this.eat() // var
+      this.eatType()
+      this.eatIdentifier()
+
+      while(this.currentToken().value === ',') {
+        this.eat(',')
+        this.eatIdentifier()
+      }
+      this.eat(';')
+
+      this.endTag('varDec')
+    }
+  }
+  compileStatements() {
+    // zero or more
+    this.compileVarDec()
+    this.compileLet()
+    this.compileIf()
+    this.compileWhile()
+    this.compileDo()
+    this.compileReturn()
+  }
+  compileLet() {
+    if (this.currentToken().value === 'let') {
+      this.startTag('letStatement')
+
+      this.eat() // let
+      this.eatIdentifier()
+      this.eat('=')
+      this.eatIdentifier()
+      this.eat(';')
+
+      this.endTag('letStatement')
+    }
+  }
+  compileIf() {
+    if (!this.match('if')) return
+
+    this.startTag('ifStatement')
+
+    this.eat('if')
+    this.eat('(')
+    this.compileExpression()
+    this.eat(')')
+    this.eat('{')
+    this.compileStatements()
+    this.eat('}')
+
+    if (this.match('else')) {
+      this.eat('else')
+      this.eat('{')
+      this.compileStatements()
+      this.eat('}')
+    }
+
+    this.endTag('ifStatement')
+  }
+  compileWhile(){
+    if (!this.match('while')) return
+    this.startTag('whileStatement')
+    this.eat('while')
+    this.eat('(')
+    this.compileExpression()
+    this.eat(')')
+    this.eat('{')
+    this.compileStatements()
+    this.eat('}')
+    this.endTag('whileStatement')
+  }
+  compileDo() {
+    // TODO
+    if (!this.match('do')) return
+    this.startTag('doStatement')
+    this.eat('do')
+    this.eatIdentifier() // fn name
+    this.eat('(')
+    this.compileExpressionList() // TODO
+    this.eat(')')
+
+    this.endTag('doStatement')
+  }
+  compileReturn() {
+    if (!this.match('return')) return
+    this.startTag('returnStatement')
+    this.eat('return')
+
+    if (!this.match(';')) {
+      this.compileExpression()
+    }
+    this.eat(';')
+
+    this.endTag('returnStatement')
+  }
+  compileExpression() {
+    this.startTag('expression')
+    this.compileTerm()
+    this.endTag('expression')
+  }
+  compileTerm() {
+    this.startTag('term')
+    this.eatIdentifier() // TODO
+    this.endTag('term')
+  }
   compileExpressionList() {}
 
 }

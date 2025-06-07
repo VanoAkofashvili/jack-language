@@ -1,12 +1,21 @@
 class Main {
     static boolean test;
 
-    // constructor Square new(int Ax, int Ay, int Asize) {
-    constructor Square new() {
-      let x = Ax;
-      let y = Ay;
-      let size = Asize;
-      do draw();
-      return this;
+
+    function void main() {
+        var SquareGame game;
+        let game = game;
+        do game.run();
+        do game.dispose();
+        return;
+    }
+
+    function void more() {
+        var boolean b;
+        if (b) {
+        }
+        else {
+        }
+        return;
     }
 }
