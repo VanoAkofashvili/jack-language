@@ -1,7 +1,8 @@
 class Main {
     static boolean test;
 
-    constructor Square new(int Ax, int Ay, int Asize) {
+    // constructor Square new(int Ax, int Ay, int Asize) {
+    constructor Square new() {
       let x = Ax;
       let y = Ay;
       let size = Asize;
