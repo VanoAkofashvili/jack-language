@@ -7,4 +7,4 @@ if (!src) {
   process.exit(1);
 }
 
-new JackAnalyzer(src).run();
+new JackAnalyzer(src).run()

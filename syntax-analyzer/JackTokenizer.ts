@@ -1,6 +1,5 @@
 import fs from "fs";
 import {
-  Keyword,
   KEYWORDS,
   STRING_MATCHER,
   SYMBOLS,
@@ -130,37 +129,38 @@ export class JackTokenizer {
     return this.cursor >= this.content.length;
   }
 
-  hasMoreTokens() {}
-
-  advance() {
+  private advance() {
     return this.content.charAt(this.cursor++);
   }
 
-  tokenType() {
-    // return type of current token
-    return TokenType.SYMBOL;
-  }
+  hasMoreTokens() {}
 
-  // only if tokenType is KEYWORD
-  keyword() {
-    return Keyword.boolean;
-  }
 
-  // only if tokenType is SYMBOL
-  symbol() {
-    return "{";
-  }
+  // tokenType() {
+  //   // return type of current token
+  //   return TokenType.SYMBOL;
+  // }
+  //
+  // // only if tokenType is KEYWORD
+  // keyword() {
+  //   return Keyword.boolean;
+  // }
 
-  // only if tokenType is IDENTIFIER
-  identifier() {
-    //return string which is the current token
-  }
-
-  // INT_CONST
-  intVal() {}
-
-  // STRING_CONST
-  stringVal() {}
+  // // only if tokenType is SYMBOL
+  // symbol() {
+  //   return "{";
+  // }
+  //
+  // // only if tokenType is IDENTIFIER
+  // identifier() {
+  //   //return string which is the current token
+  // }
+  //
+  // // INT_CONST
+  // intVal() {}
+  //
+  // // STRING_CONST
+  // stringVal() {}
 
   private addToken(tokenType: keyof typeof TokenType, value: string) {
     this.tokens.push(new Token(tokenType, value));

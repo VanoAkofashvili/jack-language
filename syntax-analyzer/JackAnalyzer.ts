@@ -20,11 +20,13 @@ export class JackAnalyzer {
   private processFile(filename: string) {
     const tokenizer = new JackTokenizer(filename);
     const xmlEngine = new XMLEngine(getOutputPath(filename));
+    
 
-    tokenizer.getTokens().forEach((token) => {
-      xmlEngine.writeToken(token);
-    });
-
-    xmlEngine.end();
+    console.log(tokenizer.getTokens())
+    // tokenizer.getTokens().forEach((token) => {
+    //   xmlEngine.writeToken(token);
+    // });
+    //
+    // xmlEngine.end();
   }
 }
