@@ -1,5 +1,5 @@
 import fs from "fs";
-import { Token } from "./constants";
+import {Token, TokenTypeMapping} from "./constants";
 
 export class XMLEngine {
   private outputFile: string;
@@ -37,11 +37,5 @@ export class XMLEngine {
     "&": "&amp;",
   };
 
-  static TYPE_MAPPING = {
-    KEYWORD: "keyword",
-    SYMBOL: "symbol",
-    IDENTIFIER: "identifier",
-    INT_CONST: "integerConstant",
-    STRING_CONST: "stringConstant",
-  };
+  static TYPE_MAPPING = TokenTypeMapping
 }

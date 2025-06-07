@@ -14,16 +14,32 @@ export class JackTokenizer {
   private cursor: number = 0;
   private start: number = 0
 
+
+  private currentTokenIndex:number = -1;
+
   constructor(src: string) {
     this.content = fs.readFileSync(src).toString("utf-8");
     this.scanTokens();
   }
 
-  public getTokens() {
-    return this.tokens;
+  public hasMoreTokens() {
+    return this.currentTokenIndex < this.tokens.length
   }
 
-  scanTokens() {
+  public advance() {
+    this.currentTokenIndex++
+  }
+
+  public getCurrentToken() {
+    return this.tokens[this.currentTokenIndex]
+  }
+
+  public getTokens() {
+    return this.tokens
+  }
+
+
+  private  scanTokens() {
     while (!this.isAtEnd()) {
       // start parsing the next token
       this.start = this.cursor
@@ -31,9 +47,9 @@ export class JackTokenizer {
     }
   }
 
-  scanSingleToken() {
+  private scanSingleToken() {
     // current char
-    const c = this.advance()
+    const c = this._advance()
 
     if (c === "/" && ["/", "*"].some(this.match.bind(this)))
       return this.consumeComment();
@@ -53,7 +69,7 @@ export class JackTokenizer {
   }
 
   private consumeComment() {
-    let c = this.advance();
+    let c = this._advance();
 
     switch (c) {
       case "/":
@@ -64,24 +80,25 @@ export class JackTokenizer {
         throw new Error("Maybe syntax error?");
     }
   }
+
   private consumeLineComment() {
-    while (this.peek() !== "\n" && !this.isAtEnd()) this.advance();
+    while (this.peek() !== "\n" && !this.isAtEnd()) this._advance();
   }
 
   private consumeBlockComment() {
-    let c = this.advance();
+    let c = this._advance();
 
     while (true) {
       // end of block comment
       if (c === "*" && this.match("/")) break;
-      c = this.advance();
+      c = this._advance();
     }
-    this.advance();
+    this._advance();
   }
 
   private getIdentifierAndKeywords() {
 
-    while(this.isAlphaNumeric(this.peek())) this.advance()
+    while(this.isAlphaNumeric(this.peek())) this._advance()
 
     const identifier = this.content.substring(
         this.start,
@@ -99,16 +116,16 @@ export class JackTokenizer {
 
   private getString() {
     let str = "";
-    let c = this.advance();
+    let c = this._advance();
     while (c !== STRING_MATCHER) {
       str += c;
-      c = this.advance();
+      c = this._advance();
     }
     return str;
   }
 
   private getDigit() {
-    while (this.isDigit(this.peek())) this.advance();
+    while (this.isDigit(this.peek())) this._advance();
     const digit = this.content.substring(
         this.start,
         this.cursor
@@ -129,11 +146,10 @@ export class JackTokenizer {
     return this.cursor >= this.content.length;
   }
 
-  private advance() {
+  private _advance() {
     return this.content.charAt(this.cursor++);
   }
 
-  hasMoreTokens() {}
 
 
   // tokenType() {
