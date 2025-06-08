@@ -1,5 +1,5 @@
-import {TokenType, TokenTypeMapping} from "./constants";
-import {ExpectedIdentifierError, InvalidTokenError, InvalidTypeError} from "./Errors";
+import {TokenTypeMapping} from "./constants";
+import {ExpectedIdentifierError, ExpectedOperatorError, InvalidTokenError, InvalidTypeError} from "./Errors";
 import {JackTokenizer} from "./JackTokenizer";
 
 export class CompilationEngine {
@@ -12,6 +12,7 @@ export class CompilationEngine {
 
 
   static Types = ['int', 'char', 'boolean']
+  static Operators = ['+', '-', '*', '/', '&', '|', '<', '>', '=']
   static Void = 'void'
 
   public getTree() {
@@ -25,7 +26,6 @@ export class CompilationEngine {
 
   private eat(expect?: string) {
     const token = this.currentToken()
-    console.log('IN EAT: ', token)
 
     if (expect && (expect !== token.value)) {
       throw new InvalidTokenError(token.value)
@@ -45,7 +45,7 @@ export class CompilationEngine {
     this.eat()
   }
 
-  public eatType(expansionList?: string[]) {
+  private eatType(expansionList?: string[]) {
     const token = this.currentToken()
 
     if (token.type === 'IDENTIFIER' || token.type === 'KEYWORD') {
@@ -62,6 +62,13 @@ export class CompilationEngine {
     }
 
   }
+
+  private eatOperator() {
+    if (!CompilationEngine.Operators.includes(this.currentToken().value))
+      throw new ExpectedOperatorError(this.currentToken().type)
+    this.eat(this.currentToken().value) // op
+  }
+
 
   private match(expect: string) {
     return this.currentToken().value === expect
@@ -97,10 +104,12 @@ export class CompilationEngine {
 
   }
   compileClassVarDec() {
-    const currentToken =this.currentToken()
+    const currentToken = this.currentToken()
 
 
-    if (!(['static', 'field'].includes(currentToken.value))) return
+    if (!(['static', 'field'].includes(currentToken.value))) {
+      return
+    }
 
     this.startTag('classVarDec')
 
@@ -114,6 +123,8 @@ export class CompilationEngine {
     }
     this.eat(';')
     this.endTag('classVarDec')
+
+    this.compileClassVarDec()
   }
   compileSubroutine() {
     if (!(['constructor', 'function', 'method'].includes(this.currentToken().value))) return
@@ -165,22 +176,30 @@ export class CompilationEngine {
   }
 
   compileVarDec() {
+    const eatVarDec = (function() {
+      if ((this.currentToken().value === 'var')) {
+        this.startTag('varDec')
 
-    if ((this.currentToken().value === 'var')) {
-      this.startTag('varDec')
-
-      this.eat() // var
-      this.eatType()
-      this.eatIdentifier()
-
-      while(this.currentToken().value === ',') {
-        this.eat(',')
+        this.eat() // var
+        this.eatType()
         this.eatIdentifier()
-      }
-      this.eat(';')
 
-      this.endTag('varDec')
+        while(this.currentToken().value === ',') {
+          this.eat(',')
+          this.eatIdentifier()
+        }
+        this.eat(';')
+
+        this.endTag('varDec')
+      }
+    }).bind(this)
+
+    eatVarDec()
+
+    while(this.match('var'))  {
+      eatVarDec()
     }
+
   }
   compileStatements() {
     this.startTag('statements')
@@ -248,7 +267,6 @@ export class CompilationEngine {
     this.endTag('whileStatement')
   }
   compileDo() {
-    // TODO
     if (!this.match('do')) return
     this.startTag('doStatement')
     this.eat('do')
@@ -294,7 +312,7 @@ export class CompilationEngine {
   }
   compileTerm() {
     this.startTag('term')
-    this.eatIdentifier() // TODO
+    this.eat() // TODO
     this.endTag('term')
   }
   compileExpressionList() {
@@ -303,8 +321,19 @@ export class CompilationEngine {
       this.endTag('expressionList')
       return
     }
+
     this.compileExpression()
-    // TODO: handle multiple expressions
+
+    if (this.match(')')) {
+      this.endTag('expressionList')
+      return
+    }
+
+    while(this.match(',')) {
+      this.eat(',')
+      this.compileExpression()
+    }
+
     this.endTag('expressionList')
   }
 

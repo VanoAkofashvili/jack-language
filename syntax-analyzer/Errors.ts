@@ -2,7 +2,13 @@ import {TokenType} from "./constants";
 
 export class ExpectedIdentifierError extends Error {
     constructor(tokenType: TokenType) {
-        super(`Unexpected token type '${tokenType}', expected 'IDENTIFIER'`);
+        super(`Expected identifier, got '${tokenType}'`);
+    }
+}
+
+export class ExpectedOperatorError extends Error {
+    constructor(tokenValue: string) {
+        super(`expected operator, got '${tokenValue}'`);
     }
 }
 
