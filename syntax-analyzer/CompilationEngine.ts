@@ -6,22 +6,26 @@ export class CompilationEngine {
   private output: string[] = []
 
   constructor(private tokenizer: JackTokenizer) {
-    console.log(tokenizer.getTokens())
-
     this.tokenizer.advance()
     this.compileClass()
-    console.log(this.output)
   }
+
 
   static Types = ['int', 'char', 'boolean']
   static Void = 'void'
+
+  public getTree() {
+    return this.output
+  }
 
   private currentToken() {
     return this.tokenizer.getCurrentToken()
   }
 
+
   private eat(expect?: string) {
     const token = this.currentToken()
+    console.log('IN EAT: ', token)
 
     if (expect && (expect !== token.value)) {
       throw new InvalidTokenError(token.value)
@@ -87,8 +91,9 @@ export class CompilationEngine {
     this.compileClassVarDec() // zero or one
     this.compileSubroutine() // zero or one
 
-    // this.eat('}')
+    this.eat('}')
     this.endTag('class')
+
 
   }
   compileClassVarDec() {
@@ -113,23 +118,28 @@ export class CompilationEngine {
   compileSubroutine() {
     if (!(['constructor', 'function', 'method'].includes(this.currentToken().value))) return
     this.startTag('subroutineDec')
+
     this.eat() // keyword - method type
-
-
     // eat common types + void
     this.eatType([CompilationEngine.Void])
     this.eatIdentifier()
     this.eat('(')
-    // //TODO: handle parameter list
     this.compileParameterList() // zero or more
     this.eat(')')
 
     this.compileSubroutineBody()
 
+    this.endTag('subroutineDec')
+
+    // recursively eat all the subroutine declarations
+    this.compileSubroutine()
 
   }
   compileParameterList() {
-    if (!CompilationEngine.Types.includes(this.currentToken().value)) return
+    this.startTag('parameterList')
+    if (!CompilationEngine.Types.includes(this.currentToken().value)) {
+      return this.endTag('parameterList')
+    }
     this.eatType()
     this.eatIdentifier()
 
@@ -139,14 +149,18 @@ export class CompilationEngine {
       this.eatType()
       this.eatIdentifier()
     }
+    this.endTag('parameterList')
   }
   compileSubroutineBody() {
     this.startTag('subroutineBody')
     this.eat('{')
 
+    // zero or more
+    this.compileVarDec()
+
     this.compileStatements()
 
-    // this.eat('}') // TODO
+    this.eat('}')
     this.endTag('subroutineBody')
   }
 
@@ -169,13 +183,21 @@ export class CompilationEngine {
     }
   }
   compileStatements() {
-    // zero or more
-    this.compileVarDec()
-    this.compileLet()
-    this.compileIf()
-    this.compileWhile()
-    this.compileDo()
-    this.compileReturn()
+    this.startTag('statements')
+    const eatStatements = (function() {
+      // zero or more
+      this.compileLet()
+      this.compileIf()
+      this.compileWhile()
+      this.compileDo()
+      this.compileReturn()
+    }).bind(this)
+    eatStatements()
+
+    while(!this.match('}')) {
+      eatStatements()
+    }
+    this.endTag('statements')
   }
   compileLet() {
     if (this.currentToken().value === 'let') {
@@ -184,7 +206,8 @@ export class CompilationEngine {
       this.eat() // let
       this.eatIdentifier()
       this.eat('=')
-      this.eatIdentifier()
+      // this.eatIdentifier()
+      this.compileExpression() // TODO
       this.eat(';')
 
       this.endTag('letStatement')
@@ -229,10 +252,26 @@ export class CompilationEngine {
     if (!this.match('do')) return
     this.startTag('doStatement')
     this.eat('do')
-    this.eatIdentifier() // fn name
-    this.eat('(')
-    this.compileExpressionList() // TODO
-    this.eat(')')
+
+
+    this.eatIdentifier() // subroutine name | className | varName
+
+    if (this.match('(')) {
+      // subroutine call
+      this.eat('(')
+      this.compileExpressionList()
+      this.eat(')')
+    } else if (this.match('.')) {
+      this.eat('.')
+      this.eatIdentifier()
+      this.eat('(')
+      this.compileExpressionList()
+      this.eat(')')
+    } else {
+      throw new InvalidTokenError(this.currentToken().value)
+    }
+
+    this.eat(';')
 
     this.endTag('doStatement')
   }
@@ -258,6 +297,15 @@ export class CompilationEngine {
     this.eatIdentifier() // TODO
     this.endTag('term')
   }
-  compileExpressionList() {}
+  compileExpressionList() {
+    this.startTag('expressionList')
+    if (this.match(')')) {
+      this.endTag('expressionList')
+      return
+    }
+    this.compileExpression()
+    // TODO: handle multiple expressions
+    this.endTag('expressionList')
+  }
 
 }

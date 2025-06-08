@@ -22,6 +22,10 @@ export class JackTokenizer {
     this.scanTokens();
   }
 
+  public getNextThreeToken(){
+    return this.tokens.slice(this.currentTokenIndex, this.currentTokenIndex + 3);
+  }
+
   public hasMoreTokens() {
     return this.currentTokenIndex < this.tokens.length
   }

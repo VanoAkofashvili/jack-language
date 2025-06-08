@@ -1,3 +1,4 @@
+import fs from 'fs'
 import {CompilationEngine} from "./CompilationEngine";
 import { isDirectory, getFiles, getOutputPath } from "./utils";
 // input - fileName.jack or directory
@@ -22,7 +23,8 @@ export class JackAnalyzer {
     const tokenizer = new JackTokenizer(filename)
     const compilationEngine = new CompilationEngine(tokenizer)
 
-    // const xmlEngine = new XMLEngine(getOutputPath(filename));
+    fs.writeFileSync(getOutputPath(filename), compilationEngine.getTree().join('\n'))
+
 
 
     // console.log(tokenizer.getTokens())
