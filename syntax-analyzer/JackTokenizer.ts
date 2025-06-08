@@ -23,7 +23,7 @@ export class JackTokenizer {
   }
 
   public getNextThreeToken(){
-    return this.tokens.slice(this.currentTokenIndex, this.currentTokenIndex + 3);
+    return this.tokens.slice(this.currentTokenIndex, this.currentTokenIndex + 8);
   }
 
   public hasMoreTokens() {
@@ -36,6 +36,9 @@ export class JackTokenizer {
 
   public getCurrentToken() {
     return this.tokens[this.currentTokenIndex]
+  }
+  public getNextToken() {
+    return this.tokens[this.currentTokenIndex+1];
   }
 
   public getTokens() {
@@ -134,7 +137,6 @@ export class JackTokenizer {
         this.start,
         this.cursor
     )
-    console.log({digit})
     return digit
   }
 

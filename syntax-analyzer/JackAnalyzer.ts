@@ -22,12 +22,17 @@ export class JackAnalyzer {
   private processFile(filename: string) {
     const tokenizer = new JackTokenizer(filename)
 
-    // fs.writeFileSync('./test', tokenizer.getTokens().map(token => {
-    //       return `${token.type}\t\t\t${token.value}`;
-    //     }).join("\n")
-    // )
-    // console.log(tokenizer)
-    const compilationEngine = new CompilationEngine(tokenizer)
+    let compilationEngine = new CompilationEngine(tokenizer)
+    try {
+
+      compilationEngine.run()
+
+    } catch(err) {
+
+      console.log('compiled: ', compilationEngine.getTree())
+      console.log(err)
+
+    }
 
     fs.writeFileSync(getOutputPath(filename), compilationEngine.getTree().join('\n'))
 
