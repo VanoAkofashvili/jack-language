@@ -1,6 +1,7 @@
 import {CompilationEngine} from "../syntax-analyzer/CompilationEngine";
 import {JackTokenizer} from "../syntax-analyzer/JackTokenizer";
 import {getFiles, getOutputPath, isDirectory} from "../syntax-analyzer/utils";
+import {SymbolTable} from "./SymbolTable";
 
 
 // 1. creates a JackTokenizer from the Xxx.jack input file;
@@ -10,6 +11,7 @@ import {getFiles, getOutputPath, isDirectory} from "../syntax-analyzer/utils";
 
 export class JackCompiler {
     constructor(private fileName: string) {
+        this.main()
     }
 
     main() {
@@ -23,8 +25,23 @@ export class JackCompiler {
 
     private processFile(src: string) {
         const tokenizer = new JackTokenizer(src)
-        const compilationEngine = new CompilationEngine(tokenizer)
+        const symTable = new SymbolTable()
+        const compilationEngine = new CompilationEngine(tokenizer, symTable)
+        compilationEngine.run()
+        console.log(compilationEngine.getTree());
+        console.log(compilationEngine.getSym())
 
         const outputFile = getOutputPath(src, '.vm')
     }
 }
+
+
+const src = process.argv[2];
+
+if (!src) {
+    console.error("Filename not provided");
+    process.exit(1);
+}
+
+const compiler = new JackCompiler(src)
+

@@ -1,11 +1,16 @@
+import {getKind, SymbolTable} from "../compiler/SymbolTable";
 import {TokenTypeMapping} from "./constants";
 import {ExpectedIdentifierError, ExpectedOperatorError, InvalidTokenError, InvalidTypeError} from "./Errors";
 import {JackTokenizer} from "./JackTokenizer";
 
 export class CompilationEngine {
     private output: string[] = []
+    private className: string
 
-    constructor(private tokenizer: JackTokenizer) {
+    constructor(
+        private tokenizer: JackTokenizer,
+        private symTable: SymbolTable
+    ) {
     }
 
     public run() {
@@ -22,6 +27,9 @@ export class CompilationEngine {
 
     public getTree() {
         return this.output
+    }
+    public getSym() {
+        return this.symTable
     }
 
     private currentToken() {
@@ -44,6 +52,7 @@ export class CompilationEngine {
 
         this.tag(representation, token.value)
         this.tokenizer.advance()
+        return token.value
     }
 
     private eatIdentifier() {
@@ -52,6 +61,7 @@ export class CompilationEngine {
             throw new ExpectedIdentifierError(token.type)
         }
         this.eat()
+        return token.value
     }
 
     private eatType(expansionList?: string[]) {
@@ -63,6 +73,7 @@ export class CompilationEngine {
             if (typesToCheck.includes(token.value) || token.type === 'IDENTIFIER') {
                 this.tag(TokenTypeMapping[token.type], token.value)
                 this.tokenizer.advance()
+                return token.value
             } else {
                 throw new InvalidTypeError(token.value)
             }
@@ -122,7 +133,8 @@ export class CompilationEngine {
         this.startTag('class')
 
         this.eat('class')
-        this.eatIdentifier() // className
+        const className = this.eatIdentifier() // className
+        this.className = className
         this.eat('{')
 
         this.compileClassVarDec() // zero or one
@@ -144,13 +156,16 @@ export class CompilationEngine {
 
         this.startTag('classVarDec')
 
-        this.eat() // static | field
-        this.eatType() // int | boolean | ...
-        this.eat() // varName
+        const kind = this.eat() // static | field
+        const type = this.eatType() // int | boolean | ...
+        const varName = this.eat() // varName
+
+        this.symTable.define(varName, type, getKind(kind))
 
         while (this.currentToken().value === ',') {
             this.eat(',')
-            this.eatIdentifier()
+            const name = this.eatIdentifier()
+            this.symTable.define(name, type, getKind(kind))
         }
         this.eat(';')
         this.endTag('classVarDec')
@@ -162,7 +177,12 @@ export class CompilationEngine {
         if (!(['constructor', 'function', 'method'].includes(this.currentToken().value))) return
         this.startTag('subroutineDec')
 
-        this.eat() // keyword - method type
+        this.symTable.reset() // clear the subroutine table
+
+        const fnName = this.eat() // keyword - method type
+        if (fnName === 'method') {
+            this.symTable.define('this', this.className, "ARG")
+        }
         // eat common types + void
         this.eatType([CompilationEngine.Void])
         this.eatIdentifier()
@@ -184,14 +204,20 @@ export class CompilationEngine {
         if (!CompilationEngine.Types.includes(this.currentToken().value)) {
             return this.endTag('parameterList')
         }
-        this.eatType()
-        this.eatIdentifier()
+        const type = this.eatType()
+        const name = this.eatIdentifier()
 
+        this.symTable.define(
+            name,
+            type,
+            'ARG'
+        )
 
         while (this.currentToken().value === ',') {
             this.eat(',')
-            this.eatType()
-            this.eatIdentifier()
+            const type = this.eatType()
+            const name = this.eatIdentifier()
+            this.symTable.define(name, type, 'ARG')
         }
         this.endTag('parameterList')
     }
@@ -215,12 +241,15 @@ export class CompilationEngine {
                 this.startTag('varDec')
 
                 this.eat() // var
-                this.eatType()
-                this.eatIdentifier()
+                const type = this.eatType()
+                const name = this.eatIdentifier()
+
+                this.symTable.define(name, type, 'VAR')
 
                 while (this.currentToken().value === ',') {
                     this.eat(',')
-                    this.eatIdentifier()
+                    const name = this.eatIdentifier()
+                    this.symTable.define(name, type, 'VAR')
                 }
                 this.eat(';')
 

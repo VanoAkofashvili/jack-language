@@ -1,6 +1,12 @@
 import {IdentifierType} from "../syntax-analyzer/constants";
 
-type Kind = keyof typeof IdentifierType;
+export type Kind = keyof typeof IdentifierType;
+
+export const getKind = (kindLowerCased: string) => {
+    const kind = IdentifierType[kindLowerCased.toUpperCase()]
+    if (!kind) throw new Error(`Invalid kind provided ${kindLowerCased}`)
+    return kind
+}
 
 class TableEntry {
     constructor(

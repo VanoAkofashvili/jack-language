@@ -1,0 +1,11 @@
+class Main {
+    method void run(int destx, int desty) {
+
+      var char key;  // the key currently pressed by the user
+      var boolean exit;
+
+      do square.dispose();
+      do Memory.deAlloc(this);
+      return;
+    }
+}
