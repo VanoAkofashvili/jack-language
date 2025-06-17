@@ -13,16 +13,22 @@ class TableEntry {
 }
 
 export class SymbolTable {
-    // private symbolTable = new Map<, TableEntry>()
-    private symbolTable: Record<string, TableEntry> = {}
+    private classTable: Record<string, TableEntry> = {}
+    private subroutineTable: Record<string, TableEntry> = {}
 
     constructor() {
     }
 
+    private getClassEntry(name: string) {
+       return this.classTable[name]
+    }
+    private getSubroutineEntry(name: string) {
+        return this.subroutineTable[name]
+    }
     private getEntry(name: string, reportError = true): TableEntry {
-        if (this.symbolTable[name]) {
-            return this.symbolTable[name]
-        }
+        let entry = this.getSubroutineEntry(name) || this.getClassEntry(name)
+
+        if (entry) return entry
 
         if (reportError) {
             throw new Error(`Variable '${name}' not found`)
@@ -30,8 +36,7 @@ export class SymbolTable {
     }
 
     reset() {
-        // TODO: not sure
-        this.symbolTable = {};
+        this.subroutineTable = {}
     }
 
     define(
@@ -39,21 +44,22 @@ export class SymbolTable {
         type: string,
         kind: Kind
     ) {
-        if (this.getEntry(name), false) {
-            throw new Error(`Variable '${name}' is already defined`)
-        }
-        const newIndex = this.varCount(kind) + 1
+        const newIndex = this.varCount(kind)
         const entry = new TableEntry(
             name,
             type,
             kind,
             newIndex
         )
-        this.symbolTable[name] = entry
+        if (kind === 'STATIC' || kind === 'FIELD') {
+            this.classTable[name] = entry
+        } else {
+            this.subroutineTable[name] = entry
+        }
     }
 
     varCount(kind: Kind) {
-        return Object.values(this.symbolTable).reduce((acc, curr) => {
+        return Object.values(this.subroutineTable).concat(Object.values(this.classTable)).reduce((acc, curr) => {
             return curr.kind === kind ? acc + 1 : acc
         }, 0)
     }
@@ -68,5 +74,12 @@ export class SymbolTable {
 
     indexOf(name: string): number {
         return this.getEntry(name).index
+    }
+
+    log() {
+        console.log({
+            classTable: this.classTable,
+            subroutineTable: this.subroutineTable,
+        })
     }
 }
