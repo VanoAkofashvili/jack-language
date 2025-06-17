@@ -12,9 +12,9 @@ const getFiles = (dirPath: string, ext: string) => {
     .map((file) => path.join(dirPath, file));
 };
 
-const getOutputPath = (inputJack: string) => {
+const getOutputPath = (inputJack: string, outputFn: string) => {
   return path.format({
-    ext: "MM.xml",
+    ext: outputFn || 'TODO.REMOVE.xml',
     name: path.basename(inputJack, ".jack"),
     dir: path.dirname(inputJack),
   });

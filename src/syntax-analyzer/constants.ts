@@ -20,6 +20,13 @@ export const TokenTypeMapping= {
 };
 
 
+export const IdentifierType = {
+  STATIC: 'STATIC',
+  FIELD: 'FIELD',
+  ARG: 'ARG',
+  VAR: 'VAR'
+}
+
 export const SYMBOLS = [
   "{",
   "}",
