@@ -8,6 +8,8 @@ export class CompilationEngine {
     private output: string[] = []
     private className: string
 
+    private whileCount = 0
+    private ifCount = 0
     private opTable = {
         '+': 'ADD',
         '-': 'SUB',
@@ -207,11 +209,19 @@ export class CompilationEngine {
             this.symTable.define('this', this.className, "ARG")
         }
         // eat common types + void
-        this.eatType([CompilationEngine.Void])
+        const returnType = this.eatType([CompilationEngine.Void])
         const fnName = this.eatIdentifier()
         this.eat('(')
         this.compileParameterList() // zero or more
+        this.eat(')')
 
+        // this.compileSubroutineBody()
+
+        this.startTag('subroutineBody')
+        this.eat('{')
+
+        // zero or more
+        this.compileVarDec()
         // Num of variables the current function uses
         const nVars = this.symTable.varCount('VAR')
         this.writer.writeFunction(`${this.className}.${fnName}`, nVars)
@@ -226,9 +236,11 @@ export class CompilationEngine {
             this.writer.writePop('POINTER', 0)
         }
 
-        this.eat(')')
+        this.compileStatements()
 
-        this.compileSubroutineBody()
+        this.eat('}')
+        this.endTag('subroutineBody')
+
 
         // TODO
         if (fnType === 'constructor') {
@@ -331,15 +343,22 @@ export class CompilationEngine {
             this.startTag('letStatement')
 
             this.eat() // let
-            this.eatIdentifier()
+            let name = this.eatIdentifier()
             if (this.match('[')) {
+                throw new Error('Array access')
                 // handling array accessor
                 this.eat('[')
                 this.compileExpression()
                 this.eat(']')
             }
+            const kind = this.symTable.kindOf(name)
+            const index = this.symTable.indexOf(name)
+            console.log({kind, index})
             this.eat('=')
             this.compileExpression()
+
+            //@ts-ignore
+            this.writer.writePop(this.convertKind(kind), index)
             this.eat(';')
 
             this.endTag('letStatement')
@@ -355,9 +374,20 @@ export class CompilationEngine {
         this.eat('(')
         this.compileExpression()
         this.eat(')')
+
+        let l1 = `IF_TRUE${this.ifCount}`
+        let l2 = `IF_FALSE${this.ifCount}`
+        let l3 = `IF_END${this.ifCount}`
+        this.writer.writeIf(l1)
+        this.writer.writeGoto(l2)
+        this.writer.writeLabel(l1)
+        this.ifCount++
+
         this.eat('{')
         this.compileStatements()
+        this.writer.writeGoto(l3)
         this.eat('}')
+        this.writer.writeLabel(l2)
 
         if (this.match('else')) {
             this.eat('else')
@@ -366,6 +396,8 @@ export class CompilationEngine {
             this.eat('}')
         }
 
+
+        this.writer.writeLabel(l3)
         this.endTag('ifStatement')
     }
 
@@ -373,11 +405,23 @@ export class CompilationEngine {
         if (!this.match('while')) return
         this.startTag('whileStatement')
         this.eat('while')
+
+        let l1 = `WHILE_EXP${this.whileCount}`
+        let l2 = `WHILE_END${this.whileCount}`
+        this.whileCount++
+        this.writer.writeLabel(l1)
+
         this.eat('(')
         this.compileExpression()
+        this.writer.writeArithmetic('NOT')
         this.eat(')')
         this.eat('{')
+
+        this.writer.writeIf(l2)
+
         this.compileStatements()
+        this.writer.writeGoto(l1)
+        this.writer.writeLabel(l2)
         this.eat('}')
         this.endTag('whileStatement')
     }
@@ -420,7 +464,6 @@ export class CompilationEngine {
                 this.writer.writeCall(`${className}.${fnName}`, nArgs)
             } else {
                 // instance call
-                console.log({className})
                 const kind = this.symTable.kindOf(className)
                 const index = this.symTable.indexOf(className)
                 this.writer.writePush(
@@ -445,11 +488,13 @@ export class CompilationEngine {
 
         if (!this.match(';')) {
             this.compileExpression()
+        } else {
+            this.writer.writePush('CONSTANT', 0)
         }
         this.eat(';')
 
-        // TODO
         this.writer.writeReturn()
+
 
         this.endTag('returnStatement')
     }
@@ -464,7 +509,7 @@ export class CompilationEngine {
             this.compileTerm()
             if (this.opTable[op]) {
                 this.writer.writeArithmetic(this.opTable[op])
-            }else if (op === '*') {
+            } else if (op === '*') {
                 this.writer.writeCall('Math.multiply', 2)
             } else if (op === '/') {
                 this.writer.writeCall('Math.divide', 2)
@@ -524,8 +569,6 @@ export class CompilationEngine {
         if (token.type === 'IDENTIFIER' && !(this.matchNext('(') || this.matchNext('.'))) {
             const varName = this.eatIdentifier() // varName
             if (!this.match('[')) {
-                console.log({varName})
-                this.symTable.log()
                 const kind = this.symTable.kindOf(varName)
                 const index = this.symTable.indexOf(varName)
                 //@ts-ignore
@@ -549,12 +592,12 @@ export class CompilationEngine {
         // unaryOp term
         if (CompilationEngine.UnaryOps.includes(token.value)) {
             const op = this.eatUnaryOp() // '-','~'
+            this.compileTerm()
             if (op === '-') {
                 this.writer.writeArithmetic('NEG')
             } else if (op === '~') {
-               this.writer.writeArithmetic('NOT')
+                this.writer.writeArithmetic('NOT')
             }
-            this.compileTerm()
             return done()
         }
 
@@ -570,8 +613,8 @@ export class CompilationEngine {
             return count
         }
 
-        count++
         this.compileExpression()
+        count++
 
         if (this.match(')')) {
             this.endTag('expressionList')
@@ -580,8 +623,8 @@ export class CompilationEngine {
 
         while (this.match(',')) {
             this.eat(',')
-            count++
             this.compileExpression()
+            count++
         }
 
         return count
