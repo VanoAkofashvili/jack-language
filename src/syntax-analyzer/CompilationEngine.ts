@@ -1,4 +1,5 @@
-import {getKind, SymbolTable} from "../compiler/SymbolTable";
+import {getKind, Kind, SymbolTable} from "../compiler/SymbolTable";
+import {VMWriter} from "../compiler/VMWriter";
 import {TokenTypeMapping} from "./constants";
 import {ExpectedIdentifierError, ExpectedOperatorError, InvalidTokenError, InvalidTypeError} from "./Errors";
 import {JackTokenizer} from "./JackTokenizer";
@@ -7,15 +8,36 @@ export class CompilationEngine {
     private output: string[] = []
     private className: string
 
+    private opTable = {
+        '+': 'ADD',
+        '-': 'SUB',
+        '&': 'AND',
+        '|': 'OR',
+        '<': 'LT',
+        '>': 'GT',
+        '=': 'EQ'
+    }
+
     constructor(
         private tokenizer: JackTokenizer,
-        private symTable: SymbolTable
+        private symTable: SymbolTable,
+        private writer: VMWriter
     ) {
     }
 
     public run() {
         this.tokenizer.advance()
         this.compileClass()
+        this.writer.close()
+    }
+
+    private convertKind(kind: Kind) {
+        return {
+            'ARG': 'ARGUMENT',
+            'STATIC': 'STATIC',
+            'VAR': 'LOCAL',
+            'FIELD': 'THIS'
+        }[kind]
     }
 
 
@@ -28,6 +50,7 @@ export class CompilationEngine {
     public getTree() {
         return this.output
     }
+
     public getSym() {
         return this.symTable
     }
@@ -86,14 +109,14 @@ export class CompilationEngine {
     private eatOperator() {
         if (!CompilationEngine.Operators.includes(this.currentToken().value))
             throw new ExpectedOperatorError(this.currentToken().type)
-        this.eat(this.currentToken().value) // op
+        return this.eat(this.currentToken().value) // op
     }
 
     private eatUnaryOp() {
         if (!CompilationEngine.UnaryOps.includes(this.currentToken().value))
             throw new ExpectedOperatorError(this.currentToken().type)
 
-        this.eat(this.currentToken().value)
+        return this.eat(this.currentToken().value)
     }
 
 
@@ -179,18 +202,38 @@ export class CompilationEngine {
 
         this.symTable.reset() // clear the subroutine table
 
-        const fnName = this.eat() // keyword - method type
-        if (fnName === 'method') {
+        const fnType = this.eat() // keyword - method type
+        if (fnType === 'method') {
             this.symTable.define('this', this.className, "ARG")
         }
         // eat common types + void
         this.eatType([CompilationEngine.Void])
-        this.eatIdentifier()
+        const fnName = this.eatIdentifier()
         this.eat('(')
         this.compileParameterList() // zero or more
+
+        // Num of variables the current function uses
+        const nVars = this.symTable.varCount('VAR')
+        this.writer.writeFunction(`${this.className}.${fnName}`, nVars)
+
+        if (fnType === 'method') {
+            this.writer.writePush('ARGUMENT', 0)
+            this.writer.writePop('POINTER', 0)
+        } else if (fnType === 'constructor') {
+            const nArgs = this.symTable.varCount('FIELD')
+            this.writer.writePush('CONSTANT', nArgs)
+            this.writer.writeCall('Memory.alloc', 1)
+            this.writer.writePop('POINTER', 0)
+        }
+
         this.eat(')')
 
         this.compileSubroutineBody()
+
+        // TODO
+        if (fnType === 'constructor') {
+            this.writer.writePush('POINTER', 0)
+        }
 
         this.endTag('subroutineDec')
 
@@ -344,24 +387,8 @@ export class CompilationEngine {
         this.startTag('doStatement')
         this.eat('do')
 
-
         this.compileSubroutineCall()
-        // this.eatIdentifier() // subroutine name | className | varName
-        //
-        // if (this.match('(')) {
-        //   // subroutine call
-        //   this.eat('(')
-        //   this.compileExpressionList()
-        //   this.eat(')')
-        // } else if (this.match('.')) {
-        //   this.eat('.')
-        //   this.eatIdentifier()
-        //   this.eat('(')
-        //   this.compileExpressionList()
-        //   this.eat(')')
-        // } else {
-        //   throw new InvalidTokenError(this.currentToken().value)
-        // }
+        this.writer.writePop('TEMP', 0)
 
         this.eat(';')
 
@@ -369,18 +396,41 @@ export class CompilationEngine {
     }
 
     compileSubroutineCall() {
-        this.eatIdentifier() // subroutineName || (className | varName)
+        const fnOrVarName = this.eatIdentifier() // subroutineName || (className | varName)
 
         if (this.match('(')) {
             // subroutine call
             this.eat('(')
-            this.compileExpressionList()
+            this.writer.writePush('POINTER', 0)
+            const count = this.compileExpressionList()
+            throw new Error('NOT SURE')
+            this.writer.writeCall(`${this.className}.${fnOrVarName}`, count + 1)
             this.eat(')')
         } else if (this.match('.')) {
+            // is Object.method() call
             this.eat('.')
-            this.eatIdentifier()
+            let className = fnOrVarName
+            const fnName = this.eatIdentifier()
+
             this.eat('(')
-            this.compileExpressionList()
+            const nArgs = this.compileExpressionList()
+
+            if (this.symTable.kindOf(className) === 'NONE') {
+                // class
+                this.writer.writeCall(`${className}.${fnName}`, nArgs)
+            } else {
+                // instance call
+                console.log({className})
+                const kind = this.symTable.kindOf(className)
+                const index = this.symTable.indexOf(className)
+                this.writer.writePush(
+                    // @ts-ignore // TODO
+                    this.convertKind(kind),
+                    index
+                )
+                this.writer.writeCall(`${className}.${fnName}`, nArgs + 1)
+            }
+
             this.eat(')')
         } else {
             throw new InvalidTokenError(this.currentToken().value)
@@ -398,6 +448,9 @@ export class CompilationEngine {
         }
         this.eat(';')
 
+        // TODO
+        this.writer.writeReturn()
+
         this.endTag('returnStatement')
     }
 
@@ -407,8 +460,17 @@ export class CompilationEngine {
 
         // (op term)*
         while (CompilationEngine.Operators.includes(this.currentToken().value)) {
-            this.eatOperator()
+            const op = this.eatOperator()
             this.compileTerm()
+            if (this.opTable[op]) {
+                this.writer.writeArithmetic(this.opTable[op])
+            }else if (op === '*') {
+                this.writer.writeCall('Math.multiply', 2)
+            } else if (op === '/') {
+                this.writer.writeCall('Math.divide', 2)
+            } else {
+                throw new Error('Invalid operator')
+            }
         }
 
         this.endTag('expression')
@@ -421,18 +483,54 @@ export class CompilationEngine {
         const done = () => this.endTag('term')
 
         // Single token constants - 1, "string", true
+        if (token.type === 'STRING_CONST') {
+            const string = this.eat()
+
+            this.writer.writePush('CONSTANT', string.length)
+            this.writer.writeCall('String.new', 1)
+
+            string.split("").forEach(char => {
+                this.writer.writePush('CONSTANT', char.charCodeAt(0))
+                this.writer.writeCall('String.appendChar', 2)
+            })
+
+            return done()
+        }
+        if (token.type === 'INT_CONST') {
+            // const token = this.eat()
+            this.writer.writePush('CONSTANT', +token.value)
+            this.eat()
+            return done()
+        }
         if (
-            token.type === 'INT_CONST'
-            || token.type === 'STRING_CONST'
-            || CompilationEngine.KeywordConstants.includes(token.value)
+            CompilationEngine.KeywordConstants.includes(token.value)
         ) {
+
+            if (['true', 'false', 'null'].includes(token.value)) {
+                this.writer.writePush('CONSTANT', 0)
+                if (token.value === 'true') {
+                    this.writer.writeArithmetic('NOT')
+                }
+            } else if (token.value === 'this') {
+                throw new Error('FUCKING')
+                this.writer.writePush('POINTER', 0)
+            }
+
             this.eat()
             return done()
         }
 
         // varName | varName[expression] and not subroutineCall
         if (token.type === 'IDENTIFIER' && !(this.matchNext('(') || this.matchNext('.'))) {
-            this.eatIdentifier() // varName
+            const varName = this.eatIdentifier() // varName
+            if (!this.match('[')) {
+                console.log({varName})
+                this.symTable.log()
+                const kind = this.symTable.kindOf(varName)
+                const index = this.symTable.indexOf(varName)
+                //@ts-ignore
+                this.writer.writePush(this.convertKind(kind), index)
+            }
             if (this.match('[')) {
                 this.eat('[')
                 this.compileExpression()
@@ -450,7 +548,12 @@ export class CompilationEngine {
 
         // unaryOp term
         if (CompilationEngine.UnaryOps.includes(token.value)) {
-            this.eatUnaryOp() // '-','~'
+            const op = this.eatUnaryOp() // '-','~'
+            if (op === '-') {
+                this.writer.writeArithmetic('NEG')
+            } else if (op === '~') {
+               this.writer.writeArithmetic('NOT')
+            }
             this.compileTerm()
             return done()
         }
@@ -460,24 +563,28 @@ export class CompilationEngine {
     }
 
     compileExpressionList() {
+        let count = 0
         this.startTag('expressionList')
         if (this.match(')')) {
             this.endTag('expressionList')
-            return
+            return count
         }
 
+        count++
         this.compileExpression()
 
         if (this.match(')')) {
             this.endTag('expressionList')
-            return
+            return count
         }
 
         while (this.match(',')) {
             this.eat(',')
+            count++
             this.compileExpression()
         }
 
+        return count
         this.endTag('expressionList')
     }
 

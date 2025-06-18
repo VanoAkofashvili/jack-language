@@ -31,7 +31,7 @@ export class SymbolTable {
     private getSubroutineEntry(name: string) {
         return this.subroutineTable[name]
     }
-    private getEntry(name: string, reportError = true): TableEntry {
+    public getEntry(name: string, reportError = true): TableEntry {
         let entry = this.getSubroutineEntry(name) || this.getClassEntry(name)
 
         if (entry) return entry
@@ -62,6 +62,7 @@ export class SymbolTable {
         } else {
             this.subroutineTable[name] = entry
         }
+        // this.log()
     }
 
     varCount(kind: Kind) {
@@ -71,7 +72,7 @@ export class SymbolTable {
     }
 
     kindOf(name: string): Kind | "NONE" {
-        return this.getEntry(name).kind || 'NONE'
+        return this.getEntry(name, false)?.kind || 'NONE'
     }
 
     typeOf(name: string): string {
