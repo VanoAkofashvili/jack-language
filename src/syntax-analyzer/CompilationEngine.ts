@@ -70,6 +70,7 @@ export class CompilationEngine {
         const token = this.currentToken()
 
         if (expect && (expect !== token.value)) {
+            console.error(`Unexpected token ${token.value}, expected: ${expect}`)
             throw new InvalidTokenError(token.value)
         }
 
@@ -241,12 +242,6 @@ export class CompilationEngine {
         this.eat('}')
         this.endTag('subroutineBody')
 
-
-        // TODO
-        if (fnType === 'constructor') {
-            this.writer.writePush('POINTER', 0)
-        }
-
         this.endTag('subroutineDec')
 
         // recursively eat all the subroutine declarations
@@ -256,11 +251,19 @@ export class CompilationEngine {
 
     compileParameterList() {
         this.startTag('parameterList')
-        if (!CompilationEngine.Types.includes(this.currentToken().value)) {
-            return this.endTag('parameterList')
-        }
+        console.log(
+            this.currentToken()
+        )
+        if (this.match(')')) return
+        // if (!CompilationEngine.Types.concat([CompilationEngine.Void]).includes(this.currentToken().value)) {
+        //     return this.endTag('parameterList')
+        // }
         const type = this.eatType()
         const name = this.eatIdentifier()
+        console.log({
+            type, name,
+            PARAMETER_LIST: true
+        })
 
         this.symTable.define(
             name,
@@ -345,21 +348,43 @@ export class CompilationEngine {
             this.eat() // let
             let name = this.eatIdentifier()
             if (this.match('[')) {
-                throw new Error('Array access')
+
+
+                const kind = this.symTable.kindOf(name)
+                const index = this.symTable.indexOf(name)
+
+                this.writer.writePush(
+                    //@ts-ignore
+                    this.convertKind(kind),
+                    index
+                )
+
                 // handling array accessor
                 this.eat('[')
                 this.compileExpression()
+                this.writer.writeArithmetic('ADD')
                 this.eat(']')
-            }
-            const kind = this.symTable.kindOf(name)
-            const index = this.symTable.indexOf(name)
-            console.log({kind, index})
-            this.eat('=')
-            this.compileExpression()
 
-            //@ts-ignore
-            this.writer.writePop(this.convertKind(kind), index)
-            this.eat(';')
+                this.eat('=')
+                this.compileExpression()
+                this.writer.writePop('TEMP', 0)
+                this.writer.writePop('POINTER', 1)
+                this.writer.writePush('TEMP', 0)
+                this.writer.writePop('THAT', 0)
+
+                this.eat(';')
+
+            } else {
+                const kind = this.symTable.kindOf(name)
+                const index = this.symTable.indexOf(name)
+                this.eat('=')
+                this.compileExpression()
+
+                //@ts-ignore
+                this.writer.writePop(this.convertKind(kind), index)
+                this.eat(';')
+            }
+
 
             this.endTag('letStatement')
         }
@@ -442,16 +467,17 @@ export class CompilationEngine {
     compileSubroutineCall() {
         const fnOrVarName = this.eatIdentifier() // subroutineName || (className | varName)
 
+        // do game.run()
         if (this.match('(')) {
             // subroutine call
             this.eat('(')
             this.writer.writePush('POINTER', 0)
             const count = this.compileExpressionList()
-            throw new Error('NOT SURE')
+            // throw new Error('NOT SURE')
             this.writer.writeCall(`${this.className}.${fnOrVarName}`, count + 1)
             this.eat(')')
         } else if (this.match('.')) {
-            // is Object.method() call
+            // is ClassName.fnName(arg1) call
             this.eat('.')
             let className = fnOrVarName
             const fnName = this.eatIdentifier()
@@ -463,15 +489,17 @@ export class CompilationEngine {
                 // class
                 this.writer.writeCall(`${className}.${fnName}`, nArgs)
             } else {
+                // is game.run(arg1) call
                 // instance call
                 const kind = this.symTable.kindOf(className)
                 const index = this.symTable.indexOf(className)
+                const type = this.symTable.typeOf(className)
                 this.writer.writePush(
                     // @ts-ignore // TODO
                     this.convertKind(kind),
                     index
                 )
-                this.writer.writeCall(`${className}.${fnName}`, nArgs + 1)
+                this.writer.writeCall(`${type}.${fnName}`, nArgs + 1)
             }
 
             this.eat(')')
@@ -557,7 +585,6 @@ export class CompilationEngine {
                     this.writer.writeArithmetic('NOT')
                 }
             } else if (token.value === 'this') {
-                throw new Error('FUCKING')
                 this.writer.writePush('POINTER', 0)
             }
 
@@ -578,6 +605,18 @@ export class CompilationEngine {
                 this.eat('[')
                 this.compileExpression()
                 this.eat(']')
+
+                const type = this.symTable.typeOf(varName)
+                const kind = this.symTable.kindOf(varName)
+                const index = this.symTable.indexOf(varName)
+                this.writer.writePush(
+                    //@ts-ignore
+                    this.convertKind(kind),
+                    index
+                )
+                this.writer.writeArithmetic('ADD')
+                this.writer.writePop('POINTER', 1)
+                this.writer.writePush('THAT', 0)
             }
             return done()
         }
